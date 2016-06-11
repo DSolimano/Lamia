@@ -79,54 +79,67 @@ namespace Lamia.Service
 
             PublisherSocket pub;
             SubscriberSocket sub;
-
-            private bool _subbed = false;
+            ServiceWrangler wrangler;
             public Tester()
             {
-
-                
-
-
-
-                //ServiceWrangler wrangler = new ServiceWrangler(new ServiceDescription());
-                //pari = wrangler.GetSocketPair();
-                
                 poller = new NetMQPoller();
-                //pari.Sub.ReceiveReady += Sub_ReceiveReady;
-                //pari.Sub.SubscribeToAnyTopic();
-                //poller.RunAsync();
+
+                SetUpRealProxy();
+                //SetUpDummyPRoxy();
 
                 timer = new NetMQTimer(new TimeSpan(0, 0, 5));
                 timer.Elapsed += Timer_Elapsed;
                 poller.Add(timer);
 
+                
+
+                poller.RunAsync();
+                Console.ReadLine();
+                poller.Dispose();
+                
+                if(null != wrangler)
+                {
+                    wrangler.Dispose();
+                }
+
+            }
+
+            private void SetUpRealProxy()
+            {
+                wrangler = new ServiceWrangler(new ServiceDescription());
+                pari = wrangler.GetSocketPair();
+
+                poller.Add(pari.Pub);
+                poller.Add(pari.Sub);
+
+                pari.Sub.ReceiveReady += Sub_ReceiveReady;
+                pari.Sub.SubscribeToAnyTopic();
+            }
+
+            private void SetUpDummyPRoxy()
+            {
                 //Establish send proxy
                 XPublisherSocket sendBackend = new XPublisherSocket();
-                sendBackend.Bind("tcp://*:1234");
+                //sendBackend.Bind("tcp://*:1234");
+                //sendBackend.Bind("tcp://localhost:1234");
+                int sendBackendPort = sendBackend.BindRandomPort("tcp://localhost");
                 XSubscriberSocket sendFrontend = new XSubscriberSocket();
                 sendFrontend.Bind("tcp://*:5678");
                 poller.Add(sendBackend);
                 poller.Add(sendFrontend);
                 var _sendProxy = new Proxy(sendFrontend, sendBackend, null, null, poller);
-                
+                _sendProxy.Start();
 
                 sub = new SubscriberSocket();
-                //sub.Connect("tcp://localhost:5678");
-                sub.Connect("tcp://localhost:1234");
+                //sub.Connect("tcp://localhost:1234");
+                sub.Connect("tcp://localhost:" + sendBackendPort);
                 sub.SubscribeToAnyTopic();
                 sub.ReceiveReady += Sub_ReceiveReady;
                 poller.Add(sub);
 
                 pub = new PublisherSocket();
-                //pub.Bind("tcp://*:5678");
                 pub.Connect("tcp://localhost:5678");
                 poller.Add(pub);
-
-
-
-                poller.RunAsync();
-                _sendProxy.Start();
-                
             }
 
             private void Sub_ReceiveReady(object sender, NetMQSocketEventArgs e)
@@ -143,8 +156,16 @@ namespace Lamia.Service
             {
                 Console.WriteLine("In Timer_Elapsed");
 
-                pub.SendFrame("DSOL.Tick.IBM", true);
-                pub.SendFrame("100", false);
+                if (null != pub)
+                {
+                    pub.SendFrame("DSOL.Tick.IBM", true);
+                    pub.SendFrame("100", false);
+                }
+                else
+                {
+                    pari.Pub.SendFrame("DSOL.Tick.IBM", true);
+                    pari.Pub.SendFrame("100", false);
+                }
             }
         }
     }

@@ -47,29 +47,32 @@ namespace Lamia.Service.Library
             
             //Establish send proxy
             XPublisherSocket sendBackend = new XPublisherSocket();
-            //sendBackend.Connect("pgm://192.168.0.43:230.1.1.1");
-            int capturePort = sendBackend.BindRandomPort("tcp://");
+            int capturePort = sendBackend.BindRandomPort("tcp://localhost");
             XSubscriberSocket sendFrontend = new XSubscriberSocket();
-            _frontendPortForSend = sendFrontend.BindRandomPort("tcp://");
+            _frontendPortForSend = sendFrontend.BindRandomPort("tcp://localhost");
 
-
+            _poller.Add(sendBackend);
+            _poller.Add(sendFrontend);
             _sendProxy = new Proxy(sendFrontend, sendBackend, null, null, _poller);
             _sendProxy.Start();
 
             XSubscriberSocket receiveFrontend = new XSubscriberSocket();
-            int republishPort = receiveFrontend.BindRandomPort("tcp://");
-            //receiveFrontend.Connect("pgm://192.168.0.43:230.1.1.1");
-            //receiveFrontend.Connect("tcp://localhost:" + capturePort);
+            int republishPort = receiveFrontend.BindRandomPort("tcp://localhost");
             XPublisherSocket receiveBackend = new XPublisherSocket();
-            _backendPortForReceive = receiveBackend.BindRandomPort("tcp://");
+            _backendPortForReceive = receiveBackend.BindRandomPort("tcp://localhost");
 
+            _poller.Add(receiveBackend);
+            _poller.Add(receiveFrontend);
             _receiveProxy = new Proxy(receiveFrontend, receiveBackend, null, null, _poller);
             _receiveProxy.Start();
 
-            _forwardingPublisher = new PublisherSocket("tcp://localhost:" + republishPort);
-            _forwardingSubscriber = new SubscriberSocket("tcp://localhost:" + capturePort);
+            _forwardingPublisher = new PublisherSocket();
+            _forwardingPublisher.Connect("tcp://localhost:" + republishPort);
+            _forwardingSubscriber = new SubscriberSocket();
+            _forwardingSubscriber.Connect("tcp://localhost:" + capturePort);
             _forwardingSubscriber.ReceiveReady += _forwardingSubscriber_ReceiveReady;
-            
+            _forwardingSubscriber.SubscribeToAnyTopic();
+
             _poller.Add(_forwardingSubscriber);
             _poller.Add(_forwardingPublisher);
 
@@ -79,6 +82,7 @@ namespace Lamia.Service.Library
         private void _forwardingSubscriber_ReceiveReady(object sender, NetMQSocketEventArgs e)
         {
             Console.WriteLine("_forwardingSubscriber_ReceiveReady - Hi");
+            _forwardingPublisher.SendMultipartMessage(e.Socket.ReceiveMultipartMessage());
         }
 
         public ServiceSocketPair GetSocketPair()

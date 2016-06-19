@@ -21,6 +21,11 @@ namespace Lamia.Service
         /// </summary>
         static void Main(string[] args)
         {
+            foreach (var ip in System.Net.Dns.GetHostAddresses(System.Net.Dns.GetHostName()))
+            {
+                Console.WriteLine(ip);
+            }
+
             Tester t = new Tester();
             Console.ReadLine();
             Console.WriteLine(t);
@@ -85,13 +90,11 @@ namespace Lamia.Service
                 poller = new NetMQPoller();
 
                 SetUpRealProxy();
-                //SetUpDummyPRoxy();
+                //SetUpDummyProxy();
 
                 timer = new NetMQTimer(new TimeSpan(0, 0, 5));
                 timer.Elapsed += Timer_Elapsed;
                 poller.Add(timer);
-
-                
 
                 poller.RunAsync();
                 Console.ReadLine();
@@ -106,7 +109,7 @@ namespace Lamia.Service
 
             private void SetUpRealProxy()
             {
-                wrangler = new ServiceWrangler(new ServiceDescription());
+                wrangler = new ServiceWrangler(new ServiceDescription(7601, "230.0.0.1", "192.168.0.43"));
                 pari = wrangler.GetSocketPair();
 
                 poller.Add(pari.Pub);
@@ -116,7 +119,7 @@ namespace Lamia.Service
                 pari.Sub.SubscribeToAnyTopic();
             }
 
-            private void SetUpDummyPRoxy()
+            private void SetUpDummyProxy()
             {
                 //Establish send proxy
                 XPublisherSocket sendBackend = new XPublisherSocket();

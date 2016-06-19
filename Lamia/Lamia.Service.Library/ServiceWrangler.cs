@@ -43,10 +43,13 @@ namespace Lamia.Service.Library
         {
             _description = sd_;
             _poller = new NetMQPoller();
+             
+            //OY now we need to run as admin - hmm
 
-            
             //Establish send proxy
             XPublisherSocket sendBackend = new XPublisherSocket();
+            sendBackend.Bind(sd_.PgmString);
+            //the captureport is used to loop outgoing messages back around for local consumers
             int capturePort = sendBackend.BindRandomPort("tcp://localhost");
             XSubscriberSocket sendFrontend = new XSubscriberSocket();
             _frontendPortForSend = sendFrontend.BindRandomPort("tcp://localhost");
@@ -56,7 +59,10 @@ namespace Lamia.Service.Library
             _sendProxy = new Proxy(sendFrontend, sendBackend, null, null, _poller);
             _sendProxy.Start();
 
+            //Establish receive proxy
             XSubscriberSocket receiveFrontend = new XSubscriberSocket();
+            receiveFrontend.Bind(sd_.PgmString);
+            //The republish port is used to "receive" any messages that are sent out from the computer - see captureport
             int republishPort = receiveFrontend.BindRandomPort("tcp://localhost");
             XPublisherSocket receiveBackend = new XPublisherSocket();
             _backendPortForReceive = receiveBackend.BindRandomPort("tcp://localhost");
